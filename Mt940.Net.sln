@@ -1,0 +1,36 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{3A7E0C11-58D2-4B6F-9A41-C00A6B1D24E8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mt940.Net", "src\Mt940.Net\Mt940.Net.csproj", "{7D9F31B2-64E3-4C70-8B52-D11B7C2E35F9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{4B8F1D22-69E3-4C70-AB52-D11C8D3F46A0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mt940.Net.Tests", "tests\Mt940.Net.Tests\Mt940.Net.Tests.csproj", "{8EA042C3-75F4-4D81-9C63-E22C9E4F57B1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7D9F31B2-64E3-4C70-8B52-D11B7C2E35F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D9F31B2-64E3-4C70-8B52-D11B7C2E35F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D9F31B2-64E3-4C70-8B52-D11B7C2E35F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D9F31B2-64E3-4C70-8B52-D11B7C2E35F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8EA042C3-75F4-4D81-9C63-E22C9E4F57B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8EA042C3-75F4-4D81-9C63-E22C9E4F57B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8EA042C3-75F4-4D81-9C63-E22C9E4F57B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8EA042C3-75F4-4D81-9C63-E22C9E4F57B1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{7D9F31B2-64E3-4C70-8B52-D11B7C2E35F9} = {3A7E0C11-58D2-4B6F-9A41-C00A6B1D24E8}
+		{8EA042C3-75F4-4D81-9C63-E22C9E4F57B1} = {4B8F1D22-69E3-4C70-AB52-D11C8D3F46A0}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,5 @@
+* text=auto
+
+# MT940 fixtures are byte-exact test inputs: line endings and encodings
+# (CRLF, Latin-1) are part of what the tests assert. Never normalize them.
+tests/Mt940.Net.Tests/fixtures/** -text
