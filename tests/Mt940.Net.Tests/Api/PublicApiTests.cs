@@ -15,6 +15,17 @@ public sealed class PublicApiTests
     }
 
     [Fact]
+    public void A_byte_order_mark_in_the_string_path_is_tolerated()
+    {
+        var text = (char)0xFEFF + TestFixtures.ReadText(TestFixtures.Minimal);
+
+        var file = Mt940Parser.Parse(text);
+
+        Assert.False(file.Report.HasWarnings);
+        Assert.Equal("MINIMAL0001", Assert.Single(file.Statements).TransactionReference);
+    }
+
+    [Fact]
     public void Empty_text_parses_to_an_empty_file()
     {
         var file = Mt940Parser.Parse(string.Empty);

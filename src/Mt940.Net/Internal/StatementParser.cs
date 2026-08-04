@@ -4,6 +4,8 @@ namespace Mt940.Internal;
 
 internal sealed class StatementParser
 {
+    private const string BankReferenceSeparator = "//";
+
     private readonly int _statementIndex;
     private readonly Mt940Options _options;
     private readonly List<ParseWarning> _warnings;
@@ -28,6 +30,8 @@ internal sealed class StatementParser
     private EntrySummary? _creditEntrySummary;
     private string? _informationToAccountOwner;
     private StatementLineDraft? _openLine;
+    private StatementLineDraft? _informationLine;
+    private bool _repeatInformationWarned;
     private bool _hasIntradayFields;
 
     private StatementParser(int statementIndex, Mt940Options options, List<ParseWarning> warnings)
@@ -57,29 +61,29 @@ internal sealed class StatementParser
         switch (field.Tag)
         {
             case TagNames.TransactionReference:
-                _transactionReference = FirstLine(field.Value);
+                _transactionReference = SingleLine(field);
                 break;
             case TagNames.RelatedReference:
-                CloseLine();
-                SetOnce(ref _relatedReference, FirstLine(field.Value), field);
+                ResetInformationTargets();
+                SetOnce(ref _relatedReference, SingleLine(field), field);
                 break;
             case TagNames.AccountIdentification:
             case TagNames.AccountIdentificationWithOwner:
-                CloseLine();
-                SetOnce(ref _account, FirstLine(field.Value), field);
+                ResetInformationTargets();
+                SetOnce(ref _account, SingleLine(field), field);
                 break;
             case TagNames.StatementNumber:
             case TagNames.StatementNumberShort:
-                CloseLine();
+                ResetInformationTargets();
                 ApplyStatementNumber(field);
                 break;
             case TagNames.OpeningBalanceFinal:
             case TagNames.OpeningBalanceIntermediate:
-                CloseLine();
+                ResetInformationTargets();
                 ApplyBalance(ref _openingBalance, field, field.Tag == TagNames.OpeningBalanceIntermediate);
                 break;
             case TagNames.StatementLine:
-                CloseLine();
+                ResetInformationTargets();
                 ApplyStatementLine(field);
                 break;
             case TagNames.Information:
@@ -87,7 +91,7 @@ internal sealed class StatementParser
                 break;
             case TagNames.ClosingBalanceFinal:
             case TagNames.ClosingBalanceIntermediate:
-                CloseLine();
+                ResetInformationTargets();
                 if (ApplyBalance(ref _closingBalance, field, field.Tag == TagNames.ClosingBalanceIntermediate))
                 {
                     _closingBalanceField = field;
@@ -95,33 +99,51 @@ internal sealed class StatementParser
 
                 break;
             case TagNames.ClosingAvailableBalance:
-                CloseLine();
+                ResetInformationTargets();
                 ApplyBalance(ref _closingAvailableBalance, field, isIntermediate: false);
                 break;
             case TagNames.ForwardAvailableBalance:
-                CloseLine();
+                ResetInformationTargets();
                 _forwardAvailableBalances.Add(
                     FieldParsers.ParseBalance(field.Value, field.LineNumber, field.Tag, isIntermediate: false));
                 break;
             case TagNames.DateTimeIndication:
-                CloseLine();
+                ResetInformationTargets();
                 _hasIntradayFields = true;
-                _reportDateTime ??= FieldParsers.ParseDateTimeIndication(field.Value, field.LineNumber, field.Tag);
+                if (_reportDateTime is not null)
+                {
+                    WarnDuplicate(field);
+                    break;
+                }
+
+                _reportDateTime = FieldParsers.ParseDateTimeIndication(field.Value, field.LineNumber, field.Tag);
                 break;
             case TagNames.FloorLimit:
-                CloseLine();
+                ResetInformationTargets();
                 _hasIntradayFields = true;
                 ApplyFloorLimit(field);
                 break;
             case TagNames.DebitEntrySummary:
-                CloseLine();
+                ResetInformationTargets();
                 _hasIntradayFields = true;
-                _debitEntrySummary ??= FieldParsers.ParseEntrySummary(field.Value, field.LineNumber, field.Tag);
+                if (_debitEntrySummary is not null)
+                {
+                    WarnDuplicate(field);
+                    break;
+                }
+
+                _debitEntrySummary = FieldParsers.ParseEntrySummary(field.Value, field.LineNumber, field.Tag);
                 break;
             case TagNames.CreditEntrySummary:
-                CloseLine();
+                ResetInformationTargets();
                 _hasIntradayFields = true;
-                _creditEntrySummary ??= FieldParsers.ParseEntrySummary(field.Value, field.LineNumber, field.Tag);
+                if (_creditEntrySummary is not null)
+                {
+                    WarnDuplicate(field);
+                    break;
+                }
+
+                _creditEntrySummary = FieldParsers.ParseEntrySummary(field.Value, field.LineNumber, field.Tag);
                 break;
             default:
                 _unknownTags.Add(new RawTag(field.Tag, field.Value, field.LineNumber));
@@ -139,7 +161,7 @@ internal sealed class StatementParser
         }
 
         (_statementNumber, _sequenceNumber) =
-            FieldParsers.ParseStatementNumber(field.Value, field.LineNumber, field.Tag);
+            FieldParsers.ParseStatementNumber(SingleLine(field), field.LineNumber, field.Tag);
     }
 
     private bool ApplyBalance(ref Balance? slot, TagField field, bool isIntermediate)
@@ -162,6 +184,14 @@ internal sealed class StatementParser
             Warn(field, $"Customer reference \"{draft.CustomerReference}\" exceeds 16 characters; kept as sent.");
         }
 
+        if (draft.SupplementaryDetails is not null
+            && draft.SupplementaryDetails.StartsWith(BankReferenceSeparator, StringComparison.Ordinal))
+        {
+            Warn(field,
+                $"Supplementary details begin with \"{BankReferenceSeparator}\"; " +
+                "this may be a bank reference wrapped onto the continuation line.");
+        }
+
         _drafts.Add(draft);
         _openLine = draft;
     }
@@ -171,8 +201,30 @@ internal sealed class StatementParser
         if (_openLine is not null)
         {
             _openLine.Information = field.Value;
+            _informationLine = _openLine;
             _openLine = null;
             return;
+        }
+
+        if (_informationLine is not null)
+        {
+            _informationLine.Information += "\n" + field.Value;
+            if (!_repeatInformationWarned)
+            {
+                _repeatInformationWarned = true;
+                Warn(field,
+                    "Consecutive :86: fields for one statement line (repeat-:86: dialect); " +
+                    "appended to the line's information.");
+            }
+
+            return;
+        }
+
+        if (_openingBalance is not null && _closingBalance is null)
+        {
+            Warn(field,
+                "Tag :86: appears in the transaction region with no preceding :61:; " +
+                "kept as statement-level information.");
         }
 
         _informationToAccountOwner = _informationToAccountOwner is null
@@ -186,9 +238,21 @@ internal sealed class StatementParser
         switch (mark)
         {
             case DebitCreditMark.Credit:
+                if (_creditFloorLimit is not null)
+                {
+                    WarnDuplicate(field);
+                    break;
+                }
+
                 _creditFloorLimit = limit;
                 break;
             case DebitCreditMark.Debit:
+                if (_debitFloorLimit is not null)
+                {
+                    WarnDuplicate(field);
+                    break;
+                }
+
                 _debitFloorLimit = limit;
                 break;
             default:
@@ -197,16 +261,34 @@ internal sealed class StatementParser
                     _debitFloorLimit = limit;
                     _floorLimitAppliesToBoth = true;
                 }
-                else
+                else if (_creditFloorLimit is null)
                 {
                     _creditFloorLimit = limit;
+                }
+                else
+                {
+                    WarnDuplicate(field);
                 }
 
                 break;
         }
     }
 
-    private void CloseLine() => _openLine = null;
+    private void ResetInformationTargets()
+    {
+        _openLine = null;
+        _informationLine = null;
+    }
+
+    private string SingleLine(TagField field)
+    {
+        if (field.Value.Contains('\n'))
+        {
+            Warn(field, $"Tag :{field.Tag}: is a single-line field; its continuation lines were ignored.");
+        }
+
+        return SwiftText.FirstLine(field.Value);
+    }
 
     private void SetOnce(ref string? slot, string value, TagField field)
     {
@@ -314,6 +396,16 @@ internal sealed class StatementParser
             return;
         }
 
+        var openingCurrency = _openingBalance.Currency;
+        var closingCurrency = _closingBalance.Currency;
+        if (!openingCurrency.AsSpan(0, 2).SequenceEqual(closingCurrency.AsSpan(0, 2)))
+        {
+            Warn(_closingBalanceField.Value,
+                $"Opening balance currency {openingCurrency} and closing balance currency " +
+                $"{closingCurrency} disagree; balance reconciliation skipped.");
+            return;
+        }
+
         var sumOfLines = 0m;
         foreach (var draft in _drafts)
         {
@@ -358,11 +450,5 @@ internal sealed class StatementParser
                 "Structured information left empty."));
             return RawInformationParser.Empty;
         }
-    }
-
-    private static string FirstLine(string value)
-    {
-        var newlineIndex = value.IndexOf('\n');
-        return newlineIndex < 0 ? value : value[..newlineIndex];
     }
 }

@@ -6,7 +6,7 @@ ISO 20022 was supposed to retire this format years ago. In practice, MT940 is st
 
 What it gives you:
 
-- MT940 statements and MT942 intraday reports, multiple statements per file, bare tag streams or `{1:}{2:}{4:...-}` block-wrapped messages, CRLF or LF
+- MT940 statements and MT942 intraday reports, multiple statements per file, bare tag streams or `{1:}{2:}{4:...-}` block-wrapped messages, CRLF, LF, or lone-CR line endings (lone CR is normalized before parsing)
 - Full `:61:` decomposition: value date, entry date with documented year-rollover resolution, `C`/`D`/`RC`/`RD` marks, funds code, amount, transaction type, customer and bank references, supplementary details
 - `decimal` for every amount, parsed invariantly: `1234,56`, `1234,`, `,50`, and the bare `1234` that broke the abandoned incumbents all parse exactly
 - Multiline `:86:` preserved raw, plus a pluggable strategy for structured sub-fields with a built-in SEPA-style `/TAG/value` implementation
@@ -48,7 +48,7 @@ foreach (var warning in file.Report.Warnings)
 }
 ```
 
-`Parse` throws a typed `Mt940ParseException` (with line number and tag) on structurally invalid input. `TryParse` never throws, whatever you feed it. `ParseAsync(Stream)` reads UTF-8 and falls back to Latin-1, which covers the encodings banks actually emit.
+`Parse` throws a typed `Mt940ParseException` (with line number and tag) on structurally invalid input. `TryParse` never throws, whatever you feed it. `ParseAsync(Stream)` reads UTF-8 and falls back to Windows-1252 (a superset of printable Latin-1 that adds the euro sign and the typographic quotes banks actually emit).
 
 ## Anatomy of a :61: line
 
@@ -168,8 +168,14 @@ Nothing is silently dropped:
 - Unknown tags are preserved verbatim on `Mt940Statement.UnknownTags` and each raises a warning
 - Lines that are neither a tag nor a continuation raise a warning
 - Missing mandatory tags (`:25:`, `:28C:`, a lone opening or closing balance) raise warnings
-- Unreconciled balances warn or throw, per `BalanceMismatchBehavior`
-- Structurally invalid fields throw `Mt940ParseException` with the line number and tag; `TryParse` converts exactly that failure into `false` and is fuzz-tested to never throw
+- Unreconciled balances warn or throw, per `BalanceMismatchBehavior`; opening and closing balances in different currencies raise a warning and skip the amount check (only the first two currency characters must match, because the third letter legitimately varies across pages of one statement)
+- Duplicate single-occurrence tags, including the MT942 set (`:13D:`, `:34F:`, `:90D:`, `:90C:`), keep the first occurrence and warn about the rest
+- Consecutive `:86:` fields for one `:61:` (the repeat-`:86:` dialect ING and others emit) are appended to that line's information, and the dialect is flagged with one warning per statement
+- A statement-level `:86:` that appears in the transaction region with no preceding `:61:` raises a warning instead of being absorbed silently
+- Continuation lines on single-line tags (`:20:`, `:21:`, `:25:`, `:28C:`) warn when they are ignored, and supplementary details that begin with `//` are flagged as a possibly wrapped bank reference
+- Structurally invalid fields throw `Mt940ParseException` with the line number and tag; `TryParse` never throws, structurally: it converts any failure into `false` and is fuzz-tested against hundreds of deterministic mutations
+
+Two sharp edges worth knowing. A narrative continuation line that happens to begin with `:20:` legitimately starts a new statement; that is how SWIFT tag streams work, and it is why banks are required to escape colons at line starts. And `:28C:` is parsed strictly to its `5n[/5n]` format: statement or sequence numbers longer than five digits are rejected loudly rather than truncated.
 
 ## Limitations and roadmap
 

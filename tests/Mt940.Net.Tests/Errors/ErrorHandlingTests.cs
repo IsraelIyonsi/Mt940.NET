@@ -131,6 +131,22 @@ public sealed class ErrorHandlingTests
         Assert.Equal(1, warning.LineNumber);
     }
 
+    [Theory]
+    [InlineData(":20:REF0001\nUNEXPECTED CONTINUATION\n:25:1234567890\n:28C:00001", "20")]
+    [InlineData(":20:REF0001\n:25:1234567890\nACCOUNT CONTINUATION\n:28C:00001", "25")]
+    [InlineData(":20:REF0001\n:25:1234567890\n:28C:00001\nMORE", "28C")]
+    [InlineData(":20:REF0001\n:21:RELREF\nRELATED CONTINUATION\n:25:1234567890\n:28C:00001", "21")]
+    public void Continuations_on_single_line_tags_warn_when_truncated(string text, string tag)
+    {
+        var file = Mt940Parser.Parse(text);
+
+        var statement = Assert.Single(file.Statements);
+        Assert.Equal("REF0001", statement.TransactionReference);
+        Assert.Contains(
+            file.Report.Warnings,
+            warning => warning.Tag == tag && warning.Message.Contains("continuation"));
+    }
+
     [Fact]
     public void Duplicate_balance_tags_keep_the_first_and_warn()
     {

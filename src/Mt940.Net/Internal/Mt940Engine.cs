@@ -4,6 +4,7 @@ internal static class Mt940Engine
 {
     internal static Mt940File Parse(string text, Mt940Options options)
     {
+        text = SwiftText.NormalizeLineEndings(text.TrimStart(SwiftText.ByteOrderMark));
         var warnings = new List<ParseWarning>();
         var fields = new List<TagField>();
         foreach (var (body, baseLineNumber) in SwiftText.ExtractBodies(text))

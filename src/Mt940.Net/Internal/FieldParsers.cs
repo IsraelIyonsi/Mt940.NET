@@ -14,26 +14,26 @@ internal static partial class FieldParsers
     private const int MaxCustomerReferenceLength = 16;
     private const int MaxUtcOffsetHours = 14;
 
-    [GeneratedRegex(@"^(?:\d+,?\d*|,\d+)$")]
+    [GeneratedRegex(@"^(?:[0-9]+,?[0-9]*|,[0-9]+)$")]
     private static partial Regex AmountPattern();
 
-    [GeneratedRegex(@"^(?<mark>C|D)(?<date>\d{6})(?<currency>[A-Z]{3})(?<amount>.+)$")]
+    [GeneratedRegex(@"^(?<mark>C|D)(?<date>[0-9]{6})(?<currency>[A-Z]{3})(?<amount>.+)$")]
     private static partial Regex BalancePattern();
 
-    [GeneratedRegex(@"^(?<number>\d{1,5})(?:/(?<sequence>\d{1,5}))?$")]
+    [GeneratedRegex(@"^(?<number>[0-9]{1,5})(?:/(?<sequence>[0-9]{1,5}))?$")]
     private static partial Regex StatementNumberPattern();
 
     [GeneratedRegex(
-        @"^(?<valueDate>\d{6})(?<entryDate>\d{4})?(?<mark>RC|RD|C|D)(?<funds>[A-Z])?(?<amount>\d+,?\d*|,\d+)(?<type>[NSF][A-Z0-9]{3})(?<rest>.*)$")]
+        @"^(?<valueDate>[0-9]{6})(?<entryDate>[0-9]{4})?(?<mark>RC|RD|C|D)(?<funds>[A-Z])?(?<amount>[0-9]+,?[0-9]*|,[0-9]+)(?<type>[NSF][A-Z0-9]{3})(?<rest>.*)$")]
     private static partial Regex StatementLinePattern();
 
-    [GeneratedRegex(@"^(?<date>\d{6})(?<time>\d{4})(?<sign>[+-])(?<offset>\d{4})$")]
+    [GeneratedRegex(@"^(?<date>[0-9]{6})(?<time>[0-9]{4})(?<sign>[+-])(?<offset>[0-9]{4})$")]
     private static partial Regex DateTimeIndicationPattern();
 
     [GeneratedRegex(@"^(?<currency>[A-Z]{3})(?<mark>C|D)?(?<amount>.+)$")]
     private static partial Regex FloorLimitPattern();
 
-    [GeneratedRegex(@"^(?<count>\d{1,5})(?<currency>[A-Z]{3})(?<amount>.+)$")]
+    [GeneratedRegex(@"^(?<count>[0-9]{1,5})(?<currency>[A-Z]{3})(?<amount>.+)$")]
     private static partial Regex EntrySummaryPattern();
 
     internal static decimal ParseAmount(string raw, int lineNumber, string tag)
@@ -56,7 +56,7 @@ internal static partial class FieldParsers
 
     internal static DateOnly ParseDate(string yymmdd, int lineNumber, string tag)
     {
-        if (yymmdd.Length != 6 || !int.TryParse(yymmdd, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+        if (yymmdd.Length != 6 || !IsAsciiDigits(yymmdd))
         {
             throw new Mt940ParseException($"Invalid date \"{yymmdd}\": expected YYMMDD", lineNumber, tag);
         }
@@ -79,7 +79,7 @@ internal static partial class FieldParsers
 
     internal static DateOnly ResolveEntryDate(DateOnly valueDate, string monthDay, int lineNumber)
     {
-        if (monthDay.Length != 4 || !int.TryParse(monthDay, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+        if (monthDay.Length != 4 || !IsAsciiDigits(monthDay))
         {
             throw new Mt940ParseException(
                 $"Invalid entry date \"{monthDay}\": expected MMDD", lineNumber, TagNames.StatementLine);
@@ -277,10 +277,19 @@ internal static partial class FieldParsers
     internal static bool ExceedsCustomerReferenceLength(string customerReference) =>
         customerReference.Length > MaxCustomerReferenceLength;
 
-    private static string FirstLine(string value)
+    private static string FirstLine(string value) => SwiftText.FirstLine(value);
+
+    private static bool IsAsciiDigits(string digits)
     {
-        var newlineIndex = value.IndexOf('\n');
-        return newlineIndex < 0 ? value : value[..newlineIndex];
+        foreach (var character in digits)
+        {
+            if (character is < '0' or > '9')
+            {
+                return false;
+            }
+        }
+
+        return digits.Length > 0;
     }
 
     private static int ToInt(string digits) =>

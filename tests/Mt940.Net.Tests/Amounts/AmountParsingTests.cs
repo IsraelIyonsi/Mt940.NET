@@ -40,6 +40,26 @@ public sealed class AmountParsingTests
     }
 
     [Fact]
+    public void Arabic_indic_digits_are_rejected_as_invalid_format_not_out_of_range()
+    {
+        var exception = Assert.Throws<Mt940ParseException>(
+            () => FieldParsers.ParseAmount("١٢٣٤,٥٦", lineNumber: 3, tag: "61"));
+
+        Assert.Contains("Invalid SWIFT amount", exception.Message);
+        Assert.DoesNotContain("out of range", exception.Message);
+    }
+
+    [Fact]
+    public void Arabic_indic_digits_in_a_statement_line_fail_loudly_with_tag_context()
+    {
+        const string text = ":20:ARABIC\n:25:1\n:28C:1\n:61:٢٦٠١٠٢D5,00NTRFNONREF";
+
+        var exception = Assert.Throws<Mt940ParseException>(() => Mt940Parser.Parse(text));
+
+        Assert.Equal("61", exception.Tag);
+    }
+
+    [Fact]
     public void Amounts_never_lose_precision_to_binary_floating_point()
     {
         var amount = FieldParsers.ParseAmount("0,10", lineNumber: 1, tag: "61");
