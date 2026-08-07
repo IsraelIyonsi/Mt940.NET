@@ -398,7 +398,7 @@ internal sealed class StatementParser
 
         var openingCurrency = _openingBalance.Currency;
         var closingCurrency = _closingBalance.Currency;
-        if (!openingCurrency.AsSpan(0, 2).SequenceEqual(closingCurrency.AsSpan(0, 2)))
+        if (!string.Equals(openingCurrency, closingCurrency, StringComparison.Ordinal))
         {
             Warn(_closingBalanceField.Value,
                 $"Opening balance currency {openingCurrency} and closing balance currency " +

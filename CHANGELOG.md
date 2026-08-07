@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-08-07
+
+### Fixed
+
+- Balance currency consistency now compares the full 3-character ISO 4217 code instead of only the first two characters. Genuinely distinct currencies that share a prefix, such as `CHF`/`CHE`, `USD`/`USN`, and `CNY`/`CNH`, previously reconciled silently with no warning because only two of the three characters were checked; they are now flagged and the amount check is skipped, as an opening/closing currency mismatch should be. The `:61:` statement-line funds code (the third character of the currency code, a separate per-line field) is unchanged.
+
 ## [0.1.0] - 2026-08-04
 
 ### Added

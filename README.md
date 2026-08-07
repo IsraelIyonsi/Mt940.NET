@@ -168,7 +168,7 @@ Nothing is silently dropped:
 - Unknown tags are preserved verbatim on `Mt940Statement.UnknownTags` and each raises a warning
 - Lines that are neither a tag nor a continuation raise a warning
 - Missing mandatory tags (`:25:`, `:28C:`, a lone opening or closing balance) raise warnings
-- Unreconciled balances warn or throw, per `BalanceMismatchBehavior`; opening and closing balances in different currencies raise a warning and skip the amount check (only the first two currency characters must match, because the third letter legitimately varies across pages of one statement)
+- Unreconciled balances warn or throw, per `BalanceMismatchBehavior`; opening and closing balances in different currencies raise a warning and skip the amount check (the balance currency is compared in full as a 3-character ISO 4217 code, so genuinely distinct currencies that share a prefix, such as `CHF` and `CHE` or `USD` and `USN`, are flagged rather than silently reconciled). This is the atomic balance currency of `:60a:`/`:62a:`; it is unrelated to the `:61:` statement-line funds code, which is separately defined as the third character of the currency code and handled per line.
 - Duplicate single-occurrence tags, including the MT942 set (`:13D:`, `:34F:`, `:90D:`, `:90C:`), keep the first occurrence and warn about the rest
 - Consecutive `:86:` fields for one `:61:` (the repeat-`:86:` dialect ING and others emit) are appended to that line's information, and the dialect is flagged with one warning per statement
 - A statement-level `:86:` that appears in the transaction region with no preceding `:61:` raises a warning instead of being absorbed silently
