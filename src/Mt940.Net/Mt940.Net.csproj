@@ -12,7 +12,7 @@
 
   <PropertyGroup>
     <PackageId>Mt940.Net</PackageId>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <Title>Mt940.NET</Title>
     <Authors>Israel Iyonsi</Authors>
     <Copyright>Copyright (c) 2026 Israel Iyonsi</Copyright>

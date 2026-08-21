@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-21
+
+### Added
+
+- `GermanGvcInformationParser`, a second built-in `IInformationParser` for the German structured :86: layout (DK / DFUE-Abkommen Anlage 3): a leading 3-digit GVC (Geschaeftsvorfallcode) followed by `?NN` sub-fields. `?00` booking text, `?10` primanota, `?20`-`?29` and `?60`-`?63` purpose (concatenated in order, no separator), `?30` counterparty BIC, `?31` counterparty IBAN, `?32`-`?33` counterparty name (concatenated in order, no separator), `?34` text key, and any other `?NN` preserved under the key `?NN`. Wrapped continuation lines are joined before scanning and a `?` not followed by two digits is kept as literal content. Opt in via `Mt940Options.InformationParser`; the raw text stays on `StatementLine.Information`. The existing default wiring and `SlashDelimitedInformationParser` are unchanged.
+
 ## [0.1.1] - 2026-08-07
 
 ### Fixed

@@ -15,7 +15,8 @@ public sealed class Mt940Options
     /// The strategy used to parse each statement line's :86: information into structured sub-fields.
     /// Defaults to <see cref="RawInformationParser.Instance"/>, which leaves the text raw.
     /// Use <see cref="SlashDelimitedInformationParser"/> for the SEPA-style /TAG/value convention,
-    /// or implement <see cref="IInformationParser"/> for a bank-specific dialect.
+    /// <see cref="GermanGvcInformationParser"/> for the German GVC / ?NN layout, or implement
+    /// <see cref="IInformationParser"/> for another bank-specific dialect.
     /// </summary>
     public IInformationParser InformationParser { get; init; } = RawInformationParser.Instance;
 }

@@ -9,7 +9,7 @@ What it gives you:
 - MT940 statements and MT942 intraday reports, multiple statements per file, bare tag streams or `{1:}{2:}{4:...-}` block-wrapped messages, CRLF, LF, or lone-CR line endings (lone CR is normalized before parsing)
 - Full `:61:` decomposition: value date, entry date with documented year-rollover resolution, `C`/`D`/`RC`/`RD` marks, funds code, amount, transaction type, customer and bank references, supplementary details
 - `decimal` for every amount, parsed invariantly: `1234,56`, `1234,`, `,50`, and the bare `1234` that broke the abandoned incumbents all parse exactly
-- Multiline `:86:` preserved raw, plus a pluggable strategy for structured sub-fields with a built-in SEPA-style `/TAG/value` implementation
+- Multiline `:86:` preserved raw, plus a pluggable strategy for structured sub-fields with two built-in implementations: the SEPA-style `/TAG/value` convention and the German GVC `?NN` layout
 - A fail-loud parse report: unknown tags kept verbatim, stray lines surfaced, and a balance reconciliation check (opening + signed lines = closing) that warns or throws, your choice
 
 ## Install
@@ -120,6 +120,31 @@ foreach (var line in file.Statements[0].Lines)
 
 Bank dialects vary; that is the point of the strategy interface. Pass your own sub-tag set to `new SlashDelimitedInformationParser(...)`, or implement `IInformationParser` for dialects that are not slash-delimited at all. Nothing is lost either way: the raw text stays available.
 
+### German GVC (`?NN`) dialect
+
+German and Austrian banks (DK / DFUE-Abkommen Anlage 3) structure `:86:` differently: a leading 3-digit GVC (Geschaeftsvorfallcode, the booking code) followed by sub-fields introduced by `?NN` markers. Opt in to `GermanGvcInformationParser.Default` instead:
+
+```csharp
+var options = new Mt940Options
+{
+    InformationParser = GermanGvcInformationParser.Default,
+};
+```
+
+`166?00SEPA-UEBERWEISUNG?20EREF+INV-2024-0042?21SVWZ+Rechnung 42?22 Miete Mai?30GENODEF1S02?31DE02500105170137075030?32Max Mustermann?33GmbH?34999` becomes:
+
+| Key | Value |
+| --- | --- |
+| `Gvc` | `166` |
+| `BookingText` | `SEPA-UEBERWEISUNG` |
+| `Purpose` | `EREF+INV-2024-0042SVWZ+Rechnung 42 Miete Mai` |
+| `Bic` | `GENODEF1S02` |
+| `Iban` | `DE02500105170137075030` |
+| `Name` | `Max MustermannGmbH` |
+| `TextKey` | `999` |
+
+The purpose sub-fields (`?20`-`?29` and `?60`-`?63`) and the counterparty-name sub-fields (`?32`-`?33`) are concatenated in the order they appear, with **no separator**, because the bank has already placed any needed spacing inside each part. `?00` is the booking text, `?10` the primanota, `?30` the counterparty BIC, `?31` the counterparty IBAN, and `?34` the text key; any other `?NN` is preserved under the key `?NN` (for example `?40`). Wrapped lines are joined before scanning, and a `?` not followed by two digits is kept as literal content rather than treated as a marker. The dictionary keys are also exposed as `GermanGvcInformationParser.GvcKey`, `.PurposeKey`, and so on, so you never have to hard-code them.
+
 ## Feeding Reconcile.Net
 
 Mt940.NET pairs with [Reconcile.Net](https://github.com/IsraelIyonsi/Reconcile.NET): this library turns the bank file into typed lines, that one matches the lines against your ledger. This compiles as pasted with both packages installed:
@@ -181,12 +206,12 @@ Two sharp edges worth knowing. A narrative continuation line that happens to beg
 
 Honest constraints in 0.1:
 
-- Structured `:86:` parsing ships one strategy, the slash-delimited SEPA convention. Fixed-position dialects (the German GVC/geschaeftsvorfallcode layout, `?20?21` sub-fields, and friends) need a custom `IInformationParser` for now; the raw text is always preserved.
+- Structured `:86:` parsing ships two strategies: the slash-delimited SEPA convention and the German GVC `?NN` layout. Other dialects still need a custom `IInformationParser`; the raw text is always preserved.
 - MT942 support covers the fields banks actually send (`:13D:`, `:34F:`, `:90D:`/`:90C:`, `:61:`/`:86:`); exotic optional fields land on `UnknownTags` rather than typed properties.
 - There is no writer yet; this release parses only.
 - Two-digit years pivot at 80: `80`-`99` mean 1980-1999, `00`-`79` mean 2000-2079.
 
-Roadmap: an MT940 writer, a camt.053 sibling package, more built-in `:86:` dialect parsers (German GVC first), and streaming parse for very large files.
+Roadmap: an MT940 writer, a camt.053 sibling package, more built-in `:86:` dialect parsers, and streaming parse for very large files.
 
 ## License
 
